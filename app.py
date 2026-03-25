@@ -37,7 +37,7 @@ def create_pagamento():
     cliente_id = data['cliente_id']
     try:
         response = requests.get(f"{API_USUARIOS_URL}{cliente_id}", timeout=5)
-        if response.status_code != 200:
+        if response.status_code not in [200, 201]:
             return {}, 404
         usuario = response.json()
     except requests.exceptions.RequestException:
