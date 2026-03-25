@@ -57,6 +57,7 @@ def create_pagamento():
         "data": datetime.now().isoformat()
     }
     db_service.salvar_pagamento(novo_pagamento)
+    novo_pagamento.pop("_id", None)
     return jsonify(novo_pagamento), 201
 
 
