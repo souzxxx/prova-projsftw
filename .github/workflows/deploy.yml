@@ -1,4 +1,4 @@
-name: Deploy Automático API Pagamentos
+name: Deploy Automático API Cursos
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
         context: .
         file: ./Dockerfile
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/api-pagamentos:${{ github.sha }}
+        tags: ${{ secrets.DOCKER_USERNAME }}/api-cursos:${{ github.sha }}
 
     - name: Deploy via SSH na AWS
       uses: appleboy/ssh-action@master
@@ -36,12 +36,14 @@ jobs:
         key: ${{ secrets.KEY_TEST }}
         port: 22
         script: |
-          docker stop api-pagamentos || true
-          docker rm --force api-pagamentos || true
+          docker stop api-cursos || true
+          docker rm --force api-cursos || true
           docker image prune -f
 
           docker run -d \
             -p 80:5000 \
             -e MONGO_URI="${{ secrets.MONGO_URI }}" \
-            --name api-pagamentos \
-            ${{ secrets.DOCKER_USERNAME }}/api-pagamentos:${{ github.sha }}
+            -e AUTH0_DOMAIN="${{ secrets.AUTH0_DOMAIN }}" \
+            -e AUTH0_AUDIENCE="${{ secrets.AUTH0_AUDIENCE }}" \
+            --name api-cursos \
+            ${{ secrets.DOCKER_USERNAME }}/api-cursos:${{ github.sha }}
