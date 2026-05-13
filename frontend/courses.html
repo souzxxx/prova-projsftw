@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Cursos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container wide">
+    <header class="topbar">
+      <div>
+        <strong id="user-email"></strong>
+        <span id="user-role" class="badge"></span>
+      </div>
+      <button id="logout-btn">Sair</button>
+    </header>
+
+    <h1>Cursos</h1>
+
+    <section class="filters">
+      <label>
+        Filtrar por status:
+        <select id="status-filter">
+          <option value="DISPONIVEL" selected>DISPONIVEL</option>
+          <option value="CANCELADO">CANCELADO</option>
+          <option value="all">Todos</option>
+        </select>
+      </label>
+      <button id="refresh-btn">Atualizar</button>
+    </section>
+
+    <section id="admin-section" style="display:none;">
+      <h2>Cadastrar curso</h2>
+      <form id="create-form">
+        <label>
+          Codigo
+          <input type="text" id="codigo" required>
+        </label>
+        <label>
+          Nome
+          <input type="text" id="nome" required>
+        </label>
+        <label>
+          Instrutor
+          <input type="text" id="instrutor" required>
+        </label>
+        <button type="submit">Cadastrar</button>
+      </form>
+      <p id="create-msg" class="error"></p>
+    </section>
+
+    <p id="list-msg" class="error"></p>
+
+    <table id="courses-table">
+      <thead>
+        <tr>
+          <th>Codigo</th>
+          <th>Nome</th>
+          <th>Instrutor</th>
+          <th>Status</th>
+          <th>Cadastrado em</th>
+          <th>Admin</th>
+          <th id="actions-th" style="display:none;">Acoes</th>
+        </tr>
+      </thead>
+      <tbody id="courses-tbody"></tbody>
+    </table>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // guard
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      window.location.href = 'index.html';
+    }
+
+    const payload = decodeJwt(token) || {};
+    const email = payload['https://prova/email'] || payload.email || '(sem email)';
+    const roles = payload['https://prova/roles'] || [];
+    const isAdmin = roles.includes('ADMIN');
+
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('user-role').textContent = roles.join(', ') || 'sem role';
+
+    if (isAdmin) {
+      document.getElementById('admin-section').style.display = 'block';
+      document.getElementById('actions-th').style.display = 'table-cell';
+    }
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.removeItem('access_token');
+      window.location.href = 'index.html';
+    });
+
+    const listMsg = document.getElementById('list-msg');
+    const createMsg = document.getElementById('create-msg');
+    const tbody = document.getElementById('courses-tbody');
+    const statusFilter = document.getElementById('status-filter');
+
+    function handleApiError(err) {
+      if (err.status === 401) {
+        localStorage.removeItem('access_token');
+        window.location.href = 'index.html';
+        return 'Sessao expirada';
+      }
+      if (err.status === 403) return 'Sem permissao';
+      if (err.status === 409) return 'Codigo duplicado';
+      return err.message || 'Erro inesperado';
+    }
+
+    async function loadCourses() {
+      listMsg.textContent = '';
+      tbody.innerHTML = '';
+      try {
+        const status = statusFilter.value;
+        const cursos = await apiGet('/courses?status=' + encodeURIComponent(status));
+        if (!cursos.length) {
+          listMsg.textContent = 'Nenhum curso encontrado';
+          return;
+        }
+        cursos.forEach((c) => {
+          const tr = document.createElement('tr');
+          tr.appendChild(td(c.codigo));
+          tr.appendChild(td(c.nome));
+          tr.appendChild(td(c.instrutor));
+          tr.appendChild(td(c.status));
+          tr.appendChild(td(formatDate(c.data_cadastro)));
+          tr.appendChild(td(c.admin_email || ''));
+          if (isAdmin) {
+            const tdAcao = document.createElement('td');
+            if (c.status === 'DISPONIVEL') {
+              const btn = document.createElement('button');
+              btn.textContent = 'Cancelar';
+              btn.addEventListener('click', () => cancelCourse(c.id));
+              tdAcao.appendChild(btn);
+            }
+            tr.appendChild(tdAcao);
+          }
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        listMsg.textContent = handleApiError(err);
+      }
+    }
+
+    function td(text) {
+      const el = document.createElement('td');
+      el.textContent = text;
+      return el;
+    }
+
+    function formatDate(s) {
+      if (!s) return '';
+      try {
+        return new Date(s).toLocaleString();
+      } catch (e) {
+        return s;
+      }
+    }
+
+    async function cancelCourse(id) {
+      if (!confirm('Cancelar este curso?')) return;
+      try {
+        await apiDelete('/courses/' + id);
+        await loadCourses();
+      } catch (err) {
+        listMsg.textContent = handleApiError(err);
+      }
+    }
+
+    document.getElementById('refresh-btn').addEventListener('click', loadCourses);
+    statusFilter.addEventListener('change', loadCourses);
+
+    if (isAdmin) {
+      document.getElementById('create-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        createMsg.textContent = '';
+        const body = {
+          codigo: document.getElementById('codigo').value.trim(),
+          nome: document.getElementById('nome').value.trim(),
+          instrutor: document.getElementById('instrutor').value.trim(),
+        };
+        try {
+          await apiPost('/courses', body);
+          document.getElementById('create-form').reset();
+          await loadCourses();
+        } catch (err) {
+          createMsg.textContent = handleApiError(err);
+        }
+      });
+    }
+
+    loadCourses();
+  </script>
+</body>
+</html>

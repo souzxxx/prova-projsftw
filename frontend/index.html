@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Cursos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Login</h1>
+    <form id="login-form">
+      <label>
+        Email
+        <input type="email" id="email" required autocomplete="username">
+      </label>
+      <label>
+        Senha
+        <input type="password" id="password" required autocomplete="current-password">
+      </label>
+      <button type="submit" id="submit-btn">Entrar</button>
+    </form>
+    <p id="error-msg" class="error"></p>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    // se ja tem token, vai pra courses
+    if (localStorage.getItem('access_token')) {
+      window.location.href = 'courses.html';
+    }
+
+    const form = document.getElementById('login-form');
+    const errorMsg = document.getElementById('error-msg');
+    const btn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Entrando...';
+      try {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const token = await login(email, password);
+        localStorage.setItem('access_token', token);
+        window.location.href = 'courses.html';
+      } catch (err) {
+        errorMsg.textContent = err.message || 'Falha no login';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    });
+  </script>
+</body>
+</html>

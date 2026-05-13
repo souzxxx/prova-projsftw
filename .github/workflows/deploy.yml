@@ -36,14 +36,28 @@ jobs:
         key: ${{ secrets.KEY_TEST }}
         port: 22
         script: |
+          docker network create rede || true
+
+          if [ -z "$(docker ps -q -f name=^mongo$)" ]; then
+            docker rm --force mongo || true
+            docker run -d \
+              --name mongo \
+              --network rede \
+              -v mongo-data:/data/db \
+              --restart unless-stopped \
+              mongo:7
+          fi
+
           docker stop api-cursos || true
           docker rm --force api-cursos || true
           docker image prune -f
 
           docker run -d \
             -p 80:5000 \
-            -e MONGO_URI="${{ secrets.MONGO_URI }}" \
+            --network rede \
+            -e MONGO_URI="mongodb://mongo:27017/cursos" \
             -e AUTH0_DOMAIN="${{ secrets.AUTH0_DOMAIN }}" \
             -e AUTH0_AUDIENCE="${{ secrets.AUTH0_AUDIENCE }}" \
+            --restart unless-stopped \
             --name api-cursos \
             ${{ secrets.DOCKER_USERNAME }}/api-cursos:${{ github.sha }}
