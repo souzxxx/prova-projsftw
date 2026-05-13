@@ -11,8 +11,8 @@ def get_courses_collection():
         return _collection
 
     mongo_uri = os.environ["MONGO_URI"]
+    db_name = os.environ.get("MONGO_DB", "cursos")
     _client = MongoClient(mongo_uri)
-    db = _client.get_default_database() or _client["cursos"]
-    _collection = db["courses"]
+    _collection = _client[db_name]["courses"]
     _collection.create_index([("codigo", ASCENDING)], unique=True)
     return _collection
