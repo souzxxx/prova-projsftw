@@ -1,35 +1,25 @@
-// configuracao
-const API_BASE = 'http://18.228.241.45';
+// configuracao Auth0 e backend
+// API_BASE vazio = mesma origem do front (Flask serve os dois)
+const API_BASE = '';
 const AUTH0_DOMAIN = 'dev-fa0at04h4b7wjopr.us.auth0.com';
 const AUTH0_CLIENT_ID = 'BxckTffhcBLwjPCuLLyWZStHdLapilAs';
-const AUTH0_CLIENT_SECRET = 'bgZk8F2geXhf8oZePf6DQTnDKKtXsxcYyIT4ptmG8W5eM_ynIt0hHAJvNJxGS689';
 const AUTH0_AUDIENCE = 'https://dev-fa0at04h4b7wjopr.us.auth0.com/api/v2/';
 
-// login via Resource Owner Password Grant
-async function login(email, password) {
-  const res = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'http://auth0.com/oauth/grant-type/password-realm',
-      realm: 'Username-Password-Authentication',
-      username: email,
-      password: password,
+// cria o cliente Auth0 (singleton)
+let _auth0 = null;
+async function getAuth0() {
+  if (_auth0) return _auth0;
+  _auth0 = await window.auth0.createAuth0Client({
+    domain: AUTH0_DOMAIN,
+    clientId: AUTH0_CLIENT_ID,
+    authorizationParams: {
       audience: AUTH0_AUDIENCE,
-      scope: 'openid email',
-      client_id: AUTH0_CLIENT_ID,
-      client_secret: AUTH0_CLIENT_SECRET,
-    }),
+      redirect_uri: window.location.origin,
+      scope: 'openid email profile',
+    },
+    cacheLocation: 'localstorage',
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data.error_description || data.error || 'Falha no login';
-    throw new Error(msg);
-  }
-  if (!data.access_token) {
-    throw new Error('Resposta sem access_token');
-  }
-  return data.access_token;
+  return _auth0;
 }
 
 // decodifica JWT (parte do meio em base64url) - sem validar assinatura
@@ -41,7 +31,6 @@ function decodeJwt(token) {
     let payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     while (payload.length % 4) payload += '=';
     const json = atob(payload);
-    // decodifica utf8
     const decoded = decodeURIComponent(
       json
         .split('')
@@ -64,11 +53,6 @@ class ApiError extends Error {
   }
 }
 
-function authHeaders() {
-  const token = localStorage.getItem('access_token');
-  return token ? { Authorization: 'Bearer ' + token } : {};
-}
-
 async function handleResponse(res) {
   if (res.status === 204) return null;
   const text = await res.text();
@@ -87,27 +71,30 @@ async function handleResponse(res) {
   return data;
 }
 
+async function authHeaders() {
+  const auth0 = await getAuth0();
+  const token = await auth0.getTokenSilently();
+  return { Authorization: 'Bearer ' + token };
+}
+
 async function apiGet(path) {
-  const res = await fetch(API_BASE + path, {
-    method: 'GET',
-    headers: { ...authHeaders() },
-  });
+  const headers = await authHeaders();
+  const res = await fetch(API_BASE + path, { method: 'GET', headers });
   return handleResponse(res);
 }
 
 async function apiPost(path, body) {
+  const headers = await authHeaders();
   const res = await fetch(API_BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
   return handleResponse(res);
 }
 
 async function apiDelete(path) {
-  const res = await fetch(API_BASE + path, {
-    method: 'DELETE',
-    headers: { ...authHeaders() },
-  });
+  const headers = await authHeaders();
+  const res = await fetch(API_BASE + path, { method: 'DELETE', headers });
   return handleResponse(res);
 }

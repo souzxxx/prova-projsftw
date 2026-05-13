@@ -4,52 +4,48 @@
   <meta charset="UTF-8">
   <title>Login - Cursos</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
 </head>
 <body>
   <div class="container">
-    <h1>Login</h1>
-    <form id="login-form">
-      <label>
-        Email
-        <input type="email" id="email" required autocomplete="username">
-      </label>
-      <label>
-        Senha
-        <input type="password" id="password" required autocomplete="current-password">
-      </label>
-      <button type="submit" id="submit-btn">Entrar</button>
-    </form>
+    <h1>Sistema de Cursos</h1>
+    <p>Entre com sua conta para continuar</p>
+    <button id="login-btn" type="button">Entrar com Auth0</button>
     <p id="error-msg" class="error"></p>
   </div>
   <script src="app.js"></script>
   <script>
-    // se ja tem token, vai pra courses
-    if (localStorage.getItem('access_token')) {
-      window.location.href = 'courses.html';
-    }
+    (async () => {
+      const auth0 = await getAuth0();
 
-    const form = document.getElementById('login-form');
-    const errorMsg = document.getElementById('error-msg');
-    const btn = document.getElementById('submit-btn');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errorMsg.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Entrando...';
-      try {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const token = await login(email, password);
-        localStorage.setItem('access_token', token);
-        window.location.href = 'courses.html';
-      } catch (err) {
-        errorMsg.textContent = err.message || 'Falha no login';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Entrar';
+      // processa callback do Auth0 (URL contem code= e state=)
+      const query = window.location.search;
+      if (query.includes('code=') && query.includes('state=')) {
+        try {
+          await auth0.handleRedirectCallback();
+          window.history.replaceState({}, document.title, window.location.pathname);
+          window.location.href = 'courses.html';
+          return;
+        } catch (err) {
+          document.getElementById('error-msg').textContent = err.message || 'Falha no callback';
+          return;
+        }
       }
-    });
+
+      // se ja esta logado, vai direto pra courses
+      if (await auth0.isAuthenticated()) {
+        window.location.href = 'courses.html';
+        return;
+      }
+
+      document.getElementById('login-btn').addEventListener('click', async () => {
+        try {
+          await auth0.loginWithRedirect();
+        } catch (err) {
+          document.getElementById('error-msg').textContent = err.message || 'Falha ao iniciar login';
+        }
+      });
+    })();
   </script>
 </body>
 </html>
